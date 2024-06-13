@@ -140,7 +140,7 @@ def load_state_dict(checkpoint_path: str, map_location='cpu'):
     return state_dict
 
 
-def load_checkpoint(model, checkpoint_path, strict=True):
+def load_checkpoint(model, checkpoint_path, partial_load='', strict=True):
     if Path(checkpoint_path).suffix in ('.npz', '.npy'):
         from .big_vision import load_big_vision_weights
         load_big_vision_weights(model, checkpoint_path)
@@ -159,7 +159,23 @@ def load_checkpoint(model, checkpoint_path, strict=True):
         del state_dict[position_id_key]
     resize_pos_embed(state_dict, model)
     resize_text_pos_embed(state_dict, model)
-    incompatible_keys = model.load_state_dict(state_dict, strict=strict)
+
+    if partial_load == 'visual':
+        prefix_whitelist = ['visual']
+    elif partial_load == 'text':
+        prefix_whitelist = ['text_projection', 'positional_embedding', 'token_embedding', 
+                            'transformer', 'ln_final', 'text.text_projection', 'text.positional_embedding', 
+                            'text.token_embedding', 'text.transformer', 'text.ln_final']
+    else:
+        prefix_whitelist = []
+    
+    if prefix_whitelist == []:
+        new_state_dict = state_dict
+    else:
+        new_state_dict = {k:v for k,v in state_dict.items() if any(k.startswith(p) for p in prefix_whitelist)}
+    
+    incompatible_keys = model.load_state_dict(new_state_dict, strict=strict if prefix_whitelist == [] else False)
+    print(incompatible_keys)
     return incompatible_keys
 
 
@@ -179,6 +195,7 @@ def create_model(
         cache_dir: Optional[str] = None,
         output_dict: Optional[bool] = None,
         require_pretrained: bool = False,
+        partial_load: str = '',
         **model_kwargs,
 ):
     force_preprocess_cfg = force_preprocess_cfg or {}
@@ -206,6 +223,7 @@ def create_model(
             precision=precision,
             device=device,
             cache_dir=cache_dir,
+            partial_load=partial_load
         )
     else:
         model_cfg = model_cfg or get_model_config(model_name)
@@ -288,7 +306,7 @@ def create_model(
 
             if checkpoint_path:
                 logging.info(f'Loading pretrained {model_name} weights ({pretrained}).')
-                load_checkpoint(model, checkpoint_path)
+                load_checkpoint(model, checkpoint_path, partial_load)
             else:
                 error_str = (
                     f'Pretrained weights ({pretrained}) not found for model {model_name}.'
@@ -298,7 +316,7 @@ def create_model(
             pretrained_loaded = True
         elif has_hf_hub_prefix:
             logging.info(f'Loading pretrained {model_name} weights ({checkpoint_path}).')
-            load_checkpoint(model, checkpoint_path)
+            load_checkpoint(model, checkpoint_path, partial_load)
             pretrained_loaded = True
 
         if require_pretrained and not pretrained_loaded:
@@ -377,6 +395,7 @@ def create_model_and_transforms(
         pretrained_hf: bool = True,
         cache_dir: Optional[str] = None,
         output_dict: Optional[bool] = None,
+        partial_load: str = '',
         **model_kwargs,
 ):
     force_preprocess_cfg = merge_preprocess_kwargs(
@@ -397,6 +416,7 @@ def create_model_and_transforms(
         pretrained_hf=pretrained_hf,
         cache_dir=cache_dir,
         output_dict=output_dict,
+        partial_load=partial_load,
         **model_kwargs,
     )
 

@@ -104,7 +104,9 @@ def train_one_epoch(model, data, loss, epoch, optimizer, scaler, scheduler, dist
                     with torch.no_grad():
                         dist_model_out = dist_model(images, texts)
                     model_out.update({f'dist_{k}': v for k, v in dist_model_out.items()})
-                losses = loss(**model_out, output_dict=True)
+                losses = loss(image_features=model_out["image_features"],
+                              text_features=model_out["text_features"],
+                              logit_scale=model_out["logit_scale"], output_dict=True)
 
                 total_loss = sum(losses.values())
                 losses["loss"] = total_loss
@@ -339,9 +341,14 @@ def evaluate(model, data, epoch, args, tb_writer=None, tokenizer=None):
             for name, val in log_data.items():
                 tb_writer.add_scalar(name, val, epoch)
 
-        with open(os.path.join(args.checkpoint_path, "results.jsonl"), "a+") as f:
-            f.write(json.dumps(metrics))
-            f.write("\n")
+        if not 'train' in data:
+            with open(os.path.join(args.log_base_path, "stats_val_eval_only{}.jsonl".format('_' + args.template_type if args.template_type != "openai" else '')), "a+") as f:
+                f.write(json.dumps(metrics))
+                f.write("\n")
+        else:
+            with open(os.path.join(args.log_base_path, "stats_val{}.jsonl".format('_' + args.template_type if args.template_type != "openai" else '')), "a+") as f:
+                f.write(json.dumps(metrics))
+                f.write("\n")
 
     if args.wandb:
         assert wandb is not None, 'Please install wandb.'

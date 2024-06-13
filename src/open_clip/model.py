@@ -257,6 +257,12 @@ class CLIP(nn.Module):
         # lock image tower as per LiT - https://arxiv.org/abs/2111.07991
         self.visual.lock(unlocked_groups=unlocked_groups, freeze_bn_stats=freeze_bn_stats)
 
+    def lock_text_tower(self, unlocked_layers=0, freeze_layer_norm=False):
+        # current implementation just locks all layers
+        for name, param in self.named_parameters():
+            if any(name.startswith(p) for p in ('token_embedding', 'positional_embedding', 'transformer', 'ln_final', 'text_projection')):
+                param.requires_grad = False
+    
     @torch.jit.ignore
     def set_grad_checkpointing(self, enable=True):
         self.visual.set_grad_checkpointing(enable)
@@ -290,13 +296,17 @@ class CLIP(nn.Module):
             image: Optional[torch.Tensor] = None,
             text: Optional[torch.Tensor] = None,
     ):
-        image_features = self.encode_image(image, normalize=True) if image is not None else None
-        text_features = self.encode_text(text, normalize=True) if text is not None else None
+        image_features_ori = self.encode_image(image, normalize=False) if image is not None else None
+        text_features_ori = self.encode_text(text, normalize=False) if text is not None else None
+        image_features = F.normalize(image_features_ori, dim=-1) if image_features_ori is not None else None
+        text_features = F.normalize(text_features_ori, dim=-1) if text_features_ori is not None else None
 
         if self.output_dict:
             out_dict = {
                 "image_features": image_features,
                 "text_features": text_features,
+                "image_features_ori": image_features_ori,
+                "text_features_ori": text_features_ori,
                 "logit_scale": self.logit_scale.exp()
             }
             if self.logit_bias is not None:
@@ -359,13 +369,17 @@ class CustomTextCLIP(nn.Module):
             image: Optional[torch.Tensor] = None,
             text: Optional[torch.Tensor] = None,
     ):
-        image_features = self.encode_image(image, normalize=True) if image is not None else None
-        text_features = self.encode_text(text, normalize=True) if text is not None else None
+        image_features_ori = self.encode_image(image, normalize=False) if image is not None else None
+        text_features_ori = self.encode_text(text, normalize=False) if text is not None else None
+        image_features = F.normalize(image_features_ori, dim=-1) if image_features_ori is not None else None
+        text_features = F.normalize(text_features_ori, dim=-1) if text_features_ori is not None else None
 
         if self.output_dict:
             out_dict = {
                 "image_features": image_features,
                 "text_features": text_features,
+                "image_features_ori": image_features_ori,
+                "text_features_ori": text_features_ori,
                 "logit_scale": self.logit_scale.exp()
             }
             if self.logit_bias is not None:
@@ -433,6 +447,7 @@ def build_model_from_openai_state_dict(
         state_dict: dict,
         quick_gelu=True,
         cast_dtype=torch.float16,
+        partial_load=''
 ):
     vit = "visual.proj" in state_dict
 
@@ -483,8 +498,23 @@ def build_model_from_openai_state_dict(
 
     for key in ["input_resolution", "context_length", "vocab_size"]:
         state_dict.pop(key, None)
+    
+    if partial_load == 'visual':
+        prefix_whitelist = ['visual']
+    elif partial_load == 'text':
+        prefix_whitelist = ['text_projection', 'positional_embedding', 'token_embedding', 
+                            'transformer', 'ln_final']
+    else:
+        prefix_whitelist = []
+    
+    if prefix_whitelist == []:
+        new_state_dict = state_dict
+    else:
+        new_state_dict = {k:v for k,v in state_dict.items() if any(k.startswith(p) for p in prefix_whitelist)}
+
     convert_weights_to_fp16(model)  # OpenAI state dicts are partially converted to float16
-    model.load_state_dict(state_dict)
+    msg = model.load_state_dict(new_state_dict, strict=True if prefix_whitelist == [] else False)
+    print(msg)
     return model.eval()
 
 

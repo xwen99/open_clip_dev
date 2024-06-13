@@ -96,10 +96,28 @@ def parse_args(args):
         help="Path to imagenet val set for conducting zero shot evaluation.",
     )
     parser.add_argument(
+        "--imagenet-100",
+        type=str,
+        default=None,
+        help="Path to imagenet-100 val set for conducting zero shot evaluation.",
+    )
+    parser.add_argument(
         "--imagenet-v2",
         type=str,
         default=None,
         help="Path to imagenet v2 for conducting zero shot evaluation.",
+    )
+    parser.add_argument(
+        "--frequency-file",
+        type=str,
+        default=None,
+        help="Path to file with class frequencies for zero shot evaluation.",
+    )
+    parser.add_argument(
+        "--imagenet100-index-file",
+        type=str,
+        default=None,
+        help="Path to file with class indexes of imagenet-100.",
     )
     parser.add_argument(
         "--logs",
@@ -203,6 +221,13 @@ def parse_args(args):
         default='',
         type=str,
         help="Use a pretrained CLIP model weights with the specified tag or file path.",
+    )
+    parser.add_argument(
+        "--partial-load",
+        default='',
+        choices=['', 'visual', 'text'],
+        type=str,
+        help="Load part of pretrained CLIP weights."
     )
     parser.add_argument(
         "--pretrained-image",
@@ -452,6 +477,16 @@ def parse_args(args):
         action="store_true",
         help='Use SigLip (sigmoid) loss.'
     )
+    parser.add_argument(
+        "--template-type",
+        default="openai",
+        type=str,
+        choices=["openai", "simple", "cname", "a+cname", "photo"],
+        help="Type of template to use for evaluation."
+    )
+
+    parser.add_argument('--imb_metrics', action='store_true', help="Compute metrics for imbalanced classification.")
+    parser.add_argument('--nc_metrics', action='store_true', help="Compute metrics for neural collapse theory.")
 
     args = parser.parse_args(args)
 

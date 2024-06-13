@@ -26,6 +26,7 @@ def load_openai_model(
         precision: Optional[str] = None,
         device: Optional[Union[str, torch.device]] = None,
         cache_dir: Optional[str] = None,
+        partial_load: Optional[str] = ''
 ):
     """Load a CLIP model
 
@@ -70,10 +71,10 @@ def load_openai_model(
     # Build a non-jit model from the OpenAI jitted model state dict
     cast_dtype = get_cast_dtype(precision)
     try:
-        model = build_model_from_openai_state_dict(state_dict or model.state_dict(), cast_dtype=cast_dtype)
+        model = build_model_from_openai_state_dict(state_dict or model.state_dict(), cast_dtype=cast_dtype, partial_load=partial_load)
     except KeyError:
         sd = {k[7:]: v for k, v in state_dict["state_dict"].items()}
-        model = build_model_from_openai_state_dict(sd, cast_dtype=cast_dtype)
+        model = build_model_from_openai_state_dict(sd, cast_dtype=cast_dtype, partial_load=partial_load)
 
     # model from OpenAI state dict is in manually cast fp16 mode, must be converted for AMP/fp32/bf16 use
     model = model.to(device)

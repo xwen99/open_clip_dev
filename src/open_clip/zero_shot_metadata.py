@@ -1,4 +1,3 @@
-
 OPENAI_IMAGENET_TEMPLATES = (
     lambda c: f'a bad photo of a {c}.',
     lambda c: f'a photo of many {c}.',
@@ -95,6 +94,17 @@ SIMPLE_IMAGENET_TEMPLATES = (
     lambda c: f'a photo of the small {c}.',
 )
 
+CNAME_TEMPLATES = (
+    lambda c: f'{c}',
+)
+
+A_CNAME_TEMPLATES = (
+    lambda c: f'a {c}',
+)
+
+PHOTO_TEMPLATES = (
+    lambda c: f'a photo of a {c}',
+)
 
 IMAGENET_CLASSNAMES = (
     "tench", "goldfish", "great white shark", "tiger shark", "hammerhead shark", "electric ray",
@@ -263,4 +273,3 @@ IMAGENET_CLASSNAMES = (
     "rose hip", "horse chestnut seed", "coral fungus", "agaric", "gyromitra", "stinkhorn mushroom",
     "earth star fungus", "hen of the woods mushroom", "bolete", "corn cob", "toilet paper"
 )
-

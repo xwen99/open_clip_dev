@@ -2,6 +2,7 @@ import ast
 import json
 import logging
 import math
+import io
 import os
 import random
 import sys
@@ -42,7 +43,8 @@ class CsvDataset(Dataset):
         return len(self.captions)
 
     def __getitem__(self, idx):
-        images = self.transforms(Image.open(str(self.images[idx])))
+        img_path = str(self.images[idx])
+        images = self.transforms(Image.open(img_path))
         texts = self.tokenize([str(self.captions[idx])])[0]
         return images, texts
 
@@ -116,7 +118,7 @@ def get_dataset_size(shards):
 
 
 def get_imagenet(args, preprocess_fns, split):
-    assert split in ["train", "val", "v2"]
+    assert split in ["train", "val", "v2", "100"]
     is_train = split == "train"
     preprocess_train, preprocess_val = preprocess_fns
 
@@ -127,6 +129,9 @@ def get_imagenet(args, preprocess_fns, split):
         if is_train:
             data_path = args.imagenet_train
             preprocess_fn = preprocess_train
+        elif split == "100":
+            data_path = args.imagenet_100
+            preprocess_fn = preprocess_val # only for evaluation
         else:
             data_path = args.imagenet_val
             preprocess_fn = preprocess_val
@@ -451,6 +456,7 @@ def get_csv_dataset(args, preprocess_fn, is_train, epoch=0, tokenizer=None):
         preprocess_fn,
         img_key=args.csv_img_key,
         caption_key=args.csv_caption_key,
+        label_key=args.csv_label_key,
         sep=args.csv_separator,
         tokenizer=tokenizer
     )
@@ -561,4 +567,7 @@ def get_data(args, preprocess_fns, epoch=0, tokenizer=None):
     if args.imagenet_v2 is not None:
         data["imagenet-v2"] = get_imagenet(args, preprocess_fns, "v2")
 
+    if args.imagenet_100 is not None:
+        data["imagenet-100"] = get_imagenet(args, preprocess_fns, "100")
+    
     return data

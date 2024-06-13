@@ -94,13 +94,14 @@ def main(args):
             date_str,
             f"model_{model_name_safe}",
             f"lr_{args.lr}",
-            f"b_{args.batch_size}",
-            f"j_{args.workers}",
+            f"b_{args.batch_size * args.world_size}", # I want the global batch size
+            f"e_{args.epochs}",
             f"p_{args.precision}",
         ])
 
     resume_latest = args.resume == 'latest'
     log_base_path = os.path.join(args.logs, args.name)
+    args.log_base_path = log_base_path
     args.log_path = None
     if is_master(args, local=args.log_local):
         os.makedirs(log_base_path, exist_ok=True)
@@ -237,6 +238,7 @@ def main(args):
         aug_cfg=args.aug_cfg,
         pretrained_image=args.pretrained_image,
         output_dict=True,
+        partial_load=args.partial_load,
         **model_kwargs,
     )
     if args.distill:
@@ -430,13 +432,14 @@ def main(args):
     loss = create_loss(args)
 
     for epoch in range(start_epoch, args.epochs):
+        args.current_epoch = epoch
         if is_master(args):
             logging.info(f'Start epoch {epoch}')
 
         train_one_epoch(model, data, loss, epoch, optimizer, scaler, scheduler, dist_model, args, tb_writer=writer)
         completed_epoch = epoch + 1
 
-        if any(v in data for v in ('val', 'imagenet-val', 'imagenet-v2')):
+        if any(v in data for v in ('val', 'imagenet-val', 'imagenet-v2', 'imagenet-100')):
             evaluate(model, data, completed_epoch, args, tb_writer=writer, tokenizer=tokenizer)
 
         # Saving checkpoints.
